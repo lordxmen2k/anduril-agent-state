@@ -137,18 +137,30 @@ structural sharing + DAG shape + tiered index**, all four together.
 7. **Real-agent integration** — ReAct agent running a multi-step
    task with Anduril as the memory backend
 
-## 7. Open questions
+## 7. Open questions (resolved)
 
-1. **Summarization at internal nodes** — should internal nodes
-   carry a summary of their subtree? If so, when is the summary
-   generated (eager, lazy, on read)?
-2. **Depth indexing for O(1) rewind** — a depth index per node
-   would let `ancestor(root, k)` be O(1) instead of O(k).
-3. **Lock-free reads** — the Bw-tree mapping table enables
-   lock-free reads in theory; do we need this in the Python
-   reference or only in the Rust port?
-4. **Cross-agent shared state** — when two agents collaborate,
-   how do they share substructure without leaking refcounts?
+1. **Summarization at internal nodes** — *Lazy, on-demand.* The
+   default state of an internal node has no summary. The
+   `summarize()` operation generates one on demand. The lookup
+   path falls back to the parent's state when no summary exists.
+   This gives flexibility without paying for it when not needed.
+
+2. **Depth indexing for O(1) rewind** — *Store `depth` as a field
+   on every node.* `ancestor(root, k)` becomes an O(k) walk up
+   the chain (each hop is a single field read), but predictable
+   and cache-friendly. True O(1) via a per-node ancestor index is
+   too much overhead for a Python reference; documented as
+   P0-04 in `GITHUB_ISSUES.md` for the Rust port.
+
+3. **Lock-free reads** — *Python reference uses a per-DAG
+   mutation lock* (same shape as the rope project). Reads are
+   lock-free. True lock-free CAS is the Rust port's claim
+   (P0-01 in issues file).
+
+4. **Cross-agent shared state** — *Reference counting just
+   works.* Two agents that share a subtree both bump the
+   refcount; when both drop, refcount=0 and the node is
+   reclaimable. No special "cross-agent" handling needed.
 
 ## 8. Next steps
 
