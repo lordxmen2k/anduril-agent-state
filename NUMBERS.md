@@ -4,6 +4,9 @@ The headline numbers from `bench/REPORT.md`, extracted for
 quick reference. Every number here is reproducible via
 `python -m bench.<file>`.
 
+For the side-by-side comparison vs MemGPT, Mem0, AWM, LangGraph,
+etc., see [`COMPARISON.md`](./COMPARISON.md).
+
 ## Our numbers (Anduril Python reference)
 
 | metric | value | how measured |

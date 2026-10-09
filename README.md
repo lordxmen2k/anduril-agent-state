@@ -15,7 +15,10 @@ model is specified in `tech_note.md`.
 ## Performance numbers
 
 See [`NUMBERS.md`](./NUMBERS.md) for a quick-reference summary of all
-benchmarks. The full report with caveats and methodology is in
+benchmarks. See [`COMPARISON.md`](./COMPARISON.md) for the
+side-by-side comparison vs MemGPT, Mem0, AWM, LangGraph, etc.
+
+The full report with caveats and methodology is in
 [`bench/REPORT.md`](./bench/REPORT.md).
 
 **Headline numbers:**
