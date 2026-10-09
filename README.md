@@ -8,9 +8,20 @@ roots remain valid. Multiple agents, branches, and rewinds share
 substructure via reference counting, so forking an agent at step 50
 is O(1) regardless of how long its history is.
 
-**Status:** design phase. No code yet. The data structure model is
-specified in `tech_note.md`. Implementation begins after the design
-is locked in.
+**Status:** Phase 1 implemented. Python reference with 88 passing
+tests, full bench suite, and ReAct agent demo. The data structure
+model is specified in `tech_note.md`.
+
+## Performance numbers
+
+See [`NUMBERS.md`](./NUMBERS.md) for a quick-reference summary of all
+benchmarks. The full report with caveats and methodology is in
+[`bench/REPORT.md`](./bench/REPORT.md).
+
+**Headline numbers:**
+- Branch from any chain length: **~720K ops/sec, O(1)**
+- 100 branches of 100-state prefix: **201 nodes** (vs 20,000 for naive list)
+- 88 tests pass in 4 seconds
 
 ## Why
 
