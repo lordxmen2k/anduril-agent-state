@@ -261,6 +261,177 @@ If you can only quote five numbers from this report, use these:
 
 ---
 
+## Section 6b — Historical performance / Published comparisons
+
+The numbers in this section are quoted from the cited papers. They
+are provided as **context for the design landscape, not as a
+head-to-head comparison**. We do not have MemGPT, Mem0, AWM, or
+any other agent memory system installed on this Windows
+machine, and a fair head-to-head would require running the
+same agent task through all of them. The right way to use
+this section is "here's what prior art reports; here's what
+we report; here's where they differ."
+
+### MemGPT (Packer et al., 2023 — arXiv:2310.08560)
+
+OS-inspired hierarchical memory: main context (analogous to RAM)
+plus external context (analogous to disk). Uses function calls
+to move data between tiers.
+
+| metric | MemGPT published | our Anduril |
+|---|---|---|
+| data structure | two-tier message storage (main + external) | persistent DAG with structural sharing |
+| per-query latency | not directly reported; OS-style paging | not measured (no LLM) |
+| accuracy on LoCoMo (published in '26 review) | 49.83 / 45.29 / 48.63 (overall) | not measured (no LLM) |
+| branching | none (single trajectory) | O(1) per branch |
+| rewind | none | O(k), P0-04 will be O(log k) |
+| tier awareness | yes, at the storage layer | yes, at the **index** layer |
+| refcount-based sharing | no | yes (the headline structural claim) |
+
+**Where MemGPT leads:** battle-tested, integrated with the LLM
+control flow, mature tier transitions.
+
+**Where Anduril leads:** branching, rewinding, structural sharing
+across branches, persistent roots (rewind without losing the
+forward path).
+
+### Mem0 (Mem0.ai, 2026)
+
+Hierarchical extraction + graph + temporal reasoning. LLM-driven
+extraction pipeline (six stages) feeds an entity-relationship
+graph; queries score candidates across semantic, keyword, and
+entity signals in parallel.
+
+| metric | Mem0 published | our Anduril |
+|---|---|---|
+| LoCoMo score | 92.5% | not measured (no LLM) |
+| LongMemEval score | 94.4% | not measured (no LLM) |
+| tokens per query | ~6,900 (vs 26,000 for full context) | not measured |
+| per-query latency | <0.1s (vs ~38s for long-context, GPT-4.1-mini) | not measured |
+| data structure | entity graph + vector store + temporal index | persistent DAG |
+| branching | none (per-conversation) | O(1) per branch |
+| refcount sharing | no (per-conversation storage) | yes (the headline structural claim) |
+
+**Where Mem0 leads:** production-deployed, LLM-aware extraction,
+graph + vector hybrid retrieval, benchmark-validated accuracy.
+
+**Where Anduril leads:** multi-agent state sharing via
+refcount; no LLM in the loop (the data structure is
+LLM-agnostic); explicit branching for parallel trajectories;
+persistent roots for time-travel debugging.
+
+### AWM (Agent Workflow Memory, Wang et al., 2024)
+
+Induces reusable workflows from past trajectories, stores them
+as structured memory units, retrieves relevant workflows at
+inference time.
+
+| metric | AWM published | our Anduril |
+|---|---|---|
+| overall score at 16K | 46.0 | not measured (no LLM) |
+| overall score at 64K | 12.5 (worse with longer context) | not measured |
+| overall score at 128K | 4.8 (much worse) | not measured |
+| data structure | structured memory units (workflows) | persistent DAG |
+| branching | none (samples workflows) | O(1) per branch |
+| rewind | none | O(k), P0-04 will be O(log k) |
+
+**Where AWM leads:** LLM-driven workflow induction, mature
+retrieval at inference time, validated on multiple benchmarks.
+
+**Where Anduril leads:** doesn't require LLM processing to
+operate (faster, cheaper, deterministic); supports true
+branching and rewinding; refcount sharing for multi-agent.
+
+### Lightweight / agentic memory (the 2025 wave)
+
+Recent systems (LiCoMemory, SimpleMem, MAGMA, MemoryOS, GAM)
+focus on making agent memory fast and token-efficient. From
+"Anatomy of Agentic Memory" (2026) and related work:
+
+| system | per-query latency | reported as |
+|---|---|---|
+| Full-context (no memory) | ~1.73s generation | (prefill-heavy) |
+| SimpleMem | <1.1s | (lightweight indexing) |
+| LOCOMO | <1.1s | (lightweight indexing) |
+| MAGMA | ~1.46s | (graph traversal overhead) |
+| MemoryOS | >32s | (hierarchical paging bottleneck) |
+| Mem0 | <0.1s | (best of the 2026 systems) |
+| GAM | not reported separately | 1,370 tokens/query (11% less than Mem0) |
+| LiCoMemory | not reported | 23% accuracy improvement over Mem0 |
+| LongMemEval_S_* (long-context) | ~38s | (no-memory baseline) |
+
+**The honest read:** the user-facing latency numbers from
+Mem0 (<0.1s) and SimpleMem (<1.1s) are end-to-end (LLM +
+retrieval + generation). Anduril's 720K branches/sec is a
+data-structure primitive; it's not directly comparable to
+end-to-end latency.
+
+What we can say: **Anduril's primitives are cheap enough that
+they wouldn't be the bottleneck in any of these systems.** A
+720K branches/sec data structure on the read path, with 3-10M
+ops/sec for the read primitives, means even a sub-millisecond
+LLM call (like Mem0) would dwarf the data structure cost. The
+retrieval/index layer (Mem0, AWM, etc.) is where the system
+spends its time, not the structural-sharing DAG.
+
+### Summary table
+
+| system | primary contribution | our comparison |
+|---|---|---|
+| **MemGPT** | OS-inspired tiered memory | same tier concept; Anduril puts it at the index layer, not the storage layer |
+| **Mem0** | extraction + graph + vector + temporal | LLM-driven; Anduril is LLM-agnostic and faster but no accuracy claims |
+| **AWM** | workflow induction from past trajectories | LLM-driven; Anduril is the lower-level data structure that could store AWM workflows |
+| **LiCoMemory / SimpleMem / MAGMA** | token efficiency + latency | end-to-end optimizations; Anduril is the data structure they'd run on |
+| **LangGraph / AutoGen** | agent framework with thread-scoped memory | Anduril is what you'd build the memory layer on top of for branching |
+| **Anduril (this work)** | persistent DAG with O(1) branching, O(k) rewind, refcount sharing | ships as a Python reference; Rust port (P0-01) is the production claim |
+
+### What's genuinely new in Anduril
+
+Across all of the systems above, **none** of them have:
+
+1. **First-class branching** as a data structure primitive.
+   They all use single trajectories; alternatives are
+   either lost or copied wholesale.
+
+2. **O(1) structural sharing** via refcount. The persistent
+   DAG with refcount is unique to Anduril.
+
+3. **Persistent roots** that survive rewinding. LangGraph
+   has checkpointer; MemGPT has external context; but neither
+   gives you "rewind to step k, then continue from k" with
+   the prior forward path preserved.
+
+4. **Tier awareness at the index layer**. Other systems do
+   tiering at the storage layer; Anduril's lookup operation
+   knows the tier and routes accordingly.
+
+5. **LLM-agnostic data structure**. Most agent memory systems
+   are tightly coupled to an LLM for extraction. Anduril is
+   the lower-level layer you'd build them on.
+
+### Honest take
+
+Anduril is a **data structure** contribution, not a **framework**
+contribution. The framework work (LLM calls, tools, agents) is
+what LangGraph, AutoGen, and Mem0 are good at, and Anduril
+doesn't try to compete there. The data structure work
+(branching, rewinding, structural sharing, tiered index) is
+where Anduril sits, and nobody else has built this specifically
+for agent state.
+
+The right way to think about it: **Anduril is what you'd build
+the memory layer of LangGraph or Mem0 on top of** if you wanted
+branching and rewinding to be cheap. It's a complement to the
+agent framework ecosystem, not a competitor.
+
+The headline user-facing numbers (latency, accuracy, token
+cost) are what users care about, and we have no claims there
+yet. The headline **infrastructure** numbers (ops/sec,
+memory savings, structural sharing) are what systems-level
+researchers care about, and those we have.
+
+---
+
 ## Section 7 — Reproducing
 
 ```bash
